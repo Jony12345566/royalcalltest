@@ -38,26 +38,34 @@ def login():
     time.sleep(5)  # allow JS to load
 
     try:
-        # try multiple locators for username
-        username_input = None
-        for locator in [(By.NAME, "username"), (By.ID, "login_user"), (By.CSS_SELECTOR, "input[placeholder='Username']")]:
+        # Email input
+        email_input = None
+        for locator in [
+            (By.NAME, "email"), 
+            (By.ID, "email"), 
+            (By.CSS_SELECTOR, "input[placeholder='Your Email Address']")
+        ]:
             try:
-                username_input = WebDriverWait(driver, 10).until(
+                email_input = WebDriverWait(driver, 10).until(
                     EC.visibility_of_element_located(locator)
                 )
                 break
             except:
                 continue
 
-        if not username_input:
+        if not email_input:
             driver.save_screenshot("/tmp/login_error.png")
-            raise Exception("Username input not found, screenshot saved: /tmp/login_error.png")
+            raise Exception("Email input not found, screenshot saved: /tmp/login_error.png")
 
-        username_input.send_keys(USERNAME)
+        email_input.send_keys(USERNAME)  # YOUR EMAIL HERE
 
-        # password input
+        # Password input
         password_input = None
-        for locator in [(By.NAME, "password"), (By.ID, "login_pass"), (By.CSS_SELECTOR, "input[placeholder='Password']")]:
+        for locator in [
+            (By.NAME, "password"), 
+            (By.ID, "password"), 
+            (By.CSS_SELECTOR, "input[placeholder='Password']")
+        ]:
             try:
                 password_input = WebDriverWait(driver, 10).until(
                     EC.visibility_of_element_located(locator)
@@ -72,29 +80,35 @@ def login():
 
         password_input.send_keys(PASSWORD)
 
-        # try login button
-        login_button = None
-        for locator in [(By.XPATH, "//button[@type='submit']"), (By.CSS_SELECTOR, "button.btn-login")]:
+        # Sign In button
+        sign_in_button = None
+        for locator in [
+            (By.XPATH, "//button[text()='Sign In']"),
+            (By.CSS_SELECTOR, "button[type='submit']")
+        ]:
             try:
-                login_button = WebDriverWait(driver, 10).until(
+                sign_in_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable(locator)
                 )
                 break
             except:
                 continue
 
-        if not login_button:
+        if not sign_in_button:
             driver.save_screenshot("/tmp/login_error.png")
-            raise Exception("Login button not found, screenshot saved: /tmp/login_error.png")
+            raise Exception("Sign In button not found, screenshot saved: /tmp/login_error.png")
 
-        login_button.click()
-        WebDriverWait(driver, 20).until(EC.url_changes(LOGIN_URL))
+        sign_in_button.click()
+
+        # Wait for login to complete (you can wait for a unique element after login)
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "table#live-calls"))  # example selector
+        )
         print("Logged in successfully!")
 
     except Exception as e:
         print("Login failed:", e)
         raise e
-
 def get_live_calls():
     driver.get(LIVE_CALLS_URL)
     time.sleep(5)  # wait for JS
