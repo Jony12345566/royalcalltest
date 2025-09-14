@@ -8,7 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from telegram import Bot
 from dotenv import load_dotenv
 
-# ---------------- Load .env ----------------
+# ---------------- Load environment variables ----------------
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -17,9 +17,9 @@ PASSWORD = os.getenv("ROYALCALL_PASSWORD")
 
 bot = Bot(token=TOKEN)
 
-# ---------------- Selenium Setup ----------------
+# ---------------- Selenium setup ----------------
 chrome_options = Options()
-chrome_options.add_argument("--headless=new")  # new headless mode
+chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 chrome_options.add_argument("--disable-gpu")
@@ -29,35 +29,77 @@ chrome_options.add_argument("--remote-debugging-port=9222")
 driver = webdriver.Chrome(options=chrome_options)
 
 # ---------------- URLs ----------------
-LOGIN_URL = "https://www.orangecarrier.com/login"
-LIVE_CALLS_URL = "https://www.orangecarrier.com/live/calls/test"
+LOGIN_URL = "https://royalcall.net/login"
+LIVE_CALLS_URL = "https://royalcall.net/live/calls"
 
 # ---------------- Functions ----------------
 def login():
     driver.get(LOGIN_URL)
-    
-    try:
-        # wait until username field is visible (handles AJAX)
-        WebDriverWait(driver, 20).until(
-            EC.visibility_of_element_located((By.NAME, "username"))
-        )
-        driver.find_element(By.NAME, "username").send_keys(USERNAME)
-        driver.find_element(By.NAME, "password").send_keys(PASSWORD)
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
+    time.sleep(5)  # allow JS to load
 
-        # wait until URL changes (login success)
+    try:
+        # try multiple locators for username
+        username_input = None
+        for locator in [(By.NAME, "username"), (By.ID, "login_user"), (By.CSS_SELECTOR, "input[placeholder='Username']")]:
+            try:
+                username_input = WebDriverWait(driver, 10).until(
+                    EC.visibility_of_element_located(locator)
+                )
+                break
+            except:
+                continue
+
+        if not username_input:
+            driver.save_screenshot("/tmp/login_error.png")
+            raise Exception("Username input not found, screenshot saved: /tmp/login_error.png")
+
+        username_input.send_keys(USERNAME)
+
+        # password input
+        password_input = None
+        for locator in [(By.NAME, "password"), (By.ID, "login_pass"), (By.CSS_SELECTOR, "input[placeholder='Password']")]:
+            try:
+                password_input = WebDriverWait(driver, 10).until(
+                    EC.visibility_of_element_located(locator)
+                )
+                break
+            except:
+                continue
+
+        if not password_input:
+            driver.save_screenshot("/tmp/login_error.png")
+            raise Exception("Password input not found, screenshot saved: /tmp/login_error.png")
+
+        password_input.send_keys(PASSWORD)
+
+        # try login button
+        login_button = None
+        for locator in [(By.XPATH, "//button[@type='submit']"), (By.CSS_SELECTOR, "button.btn-login")]:
+            try:
+                login_button = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable(locator)
+                )
+                break
+            except:
+                continue
+
+        if not login_button:
+            driver.save_screenshot("/tmp/login_error.png")
+            raise Exception("Login button not found, screenshot saved: /tmp/login_error.png")
+
+        login_button.click()
         WebDriverWait(driver, 20).until(EC.url_changes(LOGIN_URL))
         print("Logged in successfully!")
+
     except Exception as e:
-        # save screenshot for debugging
-        driver.save_screenshot("/tmp/login_error.png")
-        print("Login failed, screenshot saved: /tmp/login_error.png")
+        print("Login failed:", e)
         raise e
 
 def get_live_calls():
     driver.get(LIVE_CALLS_URL)
+    time.sleep(5)  # wait for JS
     try:
-        WebDriverWait(driver, 20).until(
+        WebDriverWait(driver, 15).until(
             EC.presence_of_all_elements_located((By.TAG_NAME, "tr"))
         )
     except Exception as e:
