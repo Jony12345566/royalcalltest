@@ -19,9 +19,12 @@ bot = Bot(token=TOKEN)
 
 # ---------------- Selenium Setup ----------------
 chrome_options = Options()
-chrome_options.add_argument("--headless")
+chrome_options.add_argument("--headless=new")  # new headless mode
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--disable-gpu")
+chrome_options.add_argument("--window-size=1920,1080")
+chrome_options.add_argument("--remote-debugging-port=9222")
 
 driver = webdriver.Chrome(options=chrome_options)
 
@@ -32,16 +35,35 @@ LIVE_CALLS_URL = "https://www.orangecarrier.com/live/calls/test"
 # ---------------- Functions ----------------
 def login():
     driver.get(LOGIN_URL)
-    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "username")))
-    driver.find_element(By.NAME, "username").send_keys(USERNAME)
-    driver.find_element(By.NAME, "password").send_keys(PASSWORD)
-    driver.find_element(By.XPATH, "//button[@type='Sign In']").click()
-    WebDriverWait(driver, 10).until(EC.url_changes(LOGIN_URL))
-    print("Logged in successfully!")
+    
+    try:
+        # wait until username field is visible (handles AJAX)
+        WebDriverWait(driver, 20).until(
+            EC.visibility_of_element_located((By.NAME, "username"))
+        )
+        driver.find_element(By.NAME, "username").send_keys(USERNAME)
+        driver.find_element(By.NAME, "password").send_keys(PASSWORD)
+        driver.find_element(By.XPATH, "//button[@type='submit']").click()
+
+        # wait until URL changes (login success)
+        WebDriverWait(driver, 20).until(EC.url_changes(LOGIN_URL))
+        print("Logged in successfully!")
+    except Exception as e:
+        # save screenshot for debugging
+        driver.save_screenshot("/tmp/login_error.png")
+        print("Login failed, screenshot saved: /tmp/login_error.png")
+        raise e
 
 def get_live_calls():
     driver.get(LIVE_CALLS_URL)
-    WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.TAG_NAME, "tr")))
+    try:
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_all_elements_located((By.TAG_NAME, "tr"))
+        )
+    except Exception as e:
+        driver.save_screenshot("/tmp/calls_error.png")
+        print("Failed to load calls page, screenshot saved: /tmp/calls_error.png")
+        return []
 
     rows = driver.find_elements(By.TAG_NAME, "tr")
     calls = []
@@ -55,7 +77,10 @@ def get_live_calls():
 
 def send_to_telegram(calls):
     for call in calls:
-        bot.send_message(chat_id=CHAT_ID, text=f"New call: {call}")
+        try:
+            bot.send_message(chat_id=CHAT_ID, text=f"New call: {call}")
+        except Exception as e:
+            print("Failed to send Telegram message:", e)
 
 def main_loop():
     seen_calls = set()
@@ -70,7 +95,7 @@ def main_loop():
 
             time.sleep(60)
         except Exception as e:
-            print("Error:", e)
+            print("Error in main loop:", e)
             time.sleep(60)
 
 # ---------------- Main ----------------
